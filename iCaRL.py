@@ -170,9 +170,11 @@ class iCaRL():
 
         # Define Loss
         if(loss == 'BCE'):
-          criterion = BCEWithLogitsLoss()
+          class_criterion = BCEWithLogitsLoss()
+          dist_criterion = BCEWithLogitsLoss()
         elif(loss == 'MSE'):
-          criterion = nn.MSELoss()
+          class_criterion = nn.MSELoss()
+          dist_criterion = nn.MSELoss()
         else: 
           class_criterion = nn.MSELoss()
           dist_criterion = BCEWithLogitsLoss()
@@ -222,31 +224,29 @@ class iCaRL():
             # Compute Losses
             if n_classes == 10 or fineTune:
                 if(loss == 'BCE'):
-                  tot_loss = criterion(outputs, labels)
+                  tot_loss = class_criterion(outputs, labels)
                 else:
-                  tot_loss = criterion(torch.sigmoid(outputs), labels)
+                  tot_loss = class_criterion(torch.sigmoid(outputs), labels)
             else:
                 with torch.no_grad():
                   old_outputs = torch.sigmoid(old_net(images))
                 targets = torch.cat((old_outputs,labels[:,n_classes-10:]),1)
                 if(loss == 'BCE'):
                   if temperature == False:
-                    tot_loss = criterion(outputs,targets)  
+                    tot_loss = class_criterion(outputs,targets)  
                   else:
                     criterion = nn.BCE()
-                    class_loss = criterion(outputs[:,n_classes-10:], labels[:,n_classes-10:])
+                    class_loss = class_criterion(outputs[:,n_classes-10:], labels[:,n_classes-10:])
                     dist_loss = dist_criterion(torch.pow(outputs[:,:n_classes-10],1/2), torch.pow(old_outputs)) 
                     tot_loss = 10/n_classes * class_loss + ((n_classes-10)/ n_classes) * dist_loss
                 elif(loss == 'MSE'):
                   if temperature == False:
-                    class_loss = criterion(torch.sigmoid(outputs[:,n_classes-10:]), labels[:,n_classes-10:])
-                    dist_loss = dist_criterion(outputs[:,:n_classes-10], old_outputs)                 
-                    tot_loss = 10/n_classes * class_loss + ((n_classes-10)/ n_classes) * dist_loss
+                    tot_loss = class_criterion(torch.sigmoid(outputs),targets)  
                   else:
-                    class_loss = criterion(outputs[:,n_classes-10:], labels[:,n_classes-10:])
-                    dist_loss = dist_criterion(torch.pow(outputs[:,:n_classes-10]),1/2), torch.pow(old_outputs,1/2))                 
+                    class_loss = class_criterion(outputs[:,n_classes-10:], labels[:,n_classes-10:])
+                    dist_loss = dist_criterion(torch.pow(outputs[:,:n_classes-10],1/2), torch.pow(old_outputs,1/2))                 
                     tot_loss = 10/n_classes * class_loss + ((n_classes-10)/ n_classes) * dist_loss                
-                  else: 
+                else: 
                     if temperature == False:
                       class_loss = class_criterion(torch.sigmoid(outputs[:,n_classes-10:]), labels[:,n_classes-10:])
                       dist_loss = dist_criterion(outputs[:,:n_classes-10], old_outputs)
@@ -356,7 +356,7 @@ class iCaRL():
       return new_exemplars
       
     # Run ICaRL
-    def run(self,train_batches,test_batches,net,herding=True,classifier='NME',NME_mode='NME', loss, temperature):
+    def run(self,train_batches,test_batches,net,loss, temperature,herding=True,classifier='NME',NME_mode='NME'):
       t0 = time.time()
       exemplars, new_exemplars = {}, []
       accuracy_per_batch = []
